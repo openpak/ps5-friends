@@ -9,7 +9,7 @@ Network=openpak.network
 # IP= is pinned on the box: run pin-ips.sh --apply after installing this quadlet.
 # Traefik routes Host(m.np.playstation.com) with the friends/blocks/basicPresences path prefixes to :8080.
 Environment=PS5_ADDR=:8080
-EnvironmentFile=/etc/openpak/shared.env
+EnvironmentFile=/etc/openpak/ps5.env
 
 [Service]
 Restart=always
