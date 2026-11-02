@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenPak PS5 friends, blocks and presence (ps5-friends): m.np.playstation.com userProfile paths
+
+[Container]
+ContainerName=openpak-ps5-friends
+Image=ghcr.io/openpak/ps5-friends:latest
+AutoUpdate=registry
+Network=openpak.network
+# IP= is pinned on the box: run pin-ips.sh --apply after installing this quadlet.
+# Traefik routes Host(m.np.playstation.com) with the friends/blocks/basicPresences path prefixes to :8080.
+Environment=PS5_ADDR=:8080
+EnvironmentFile=/etc/openpak/shared.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
