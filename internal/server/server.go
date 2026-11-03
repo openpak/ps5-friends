@@ -200,10 +200,19 @@ func (s *Server) removeFriend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.Remove(me, other); err != nil {
-		httpx.WriteError(w, 404, codeNotFound, "Resource not found")
+		notFoundOrInternal(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// notFoundOrInternal answers 404 for "no such relationship" and 500 for a storage failure.
+func notFoundOrInternal(w http.ResponseWriter, err error) {
+	if errors.Is(err, social.ErrNothing) {
+		httpx.WriteError(w, 404, codeNotFound, "Resource not found")
+		return
+	}
+	httpx.WriteError(w, 500, 1, "Internal error")
 }
 
 func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +246,11 @@ func (s *Server) block(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.Block(me, other); err != nil {
-		bad(w, "Cannot block yourself")
+		if errors.Is(err, social.ErrSelf) {
+			bad(w, "Cannot block yourself")
+		} else {
+			httpx.WriteError(w, 500, 1, "Internal error")
+		}
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -253,7 +266,7 @@ func (s *Server) unblock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.Unblock(me, other); err != nil {
-		httpx.WriteError(w, 404, codeNotFound, "Resource not found")
+		notFoundOrInternal(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

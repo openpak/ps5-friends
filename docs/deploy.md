@@ -20,6 +20,8 @@ docker build -t ps5-friends .
 | `PS5_ADDR` | no | `:8080` | HTTP listen address |
 | `PS5_TOKEN_KEY` | yes | | HMAC key for bearer tokens (>= 32 bytes), shared with ps5-auth |
 | `PS5_LOG_LEVEL` | no | `info` | `debug`, `info`, `warn`, `error` |
+| `PS5_DATABASE_URL` | yes | | Postgres URL (3-connection pool); the service exits without it unless `PS5_DEV_MEMORY=1`. Tables are created at start |
+| `PS5_DEV_MEMORY` | no | | `1`: keep state in memory, lost on restart (local development only) |
 
 The other `PS5_*` variables of ps5-common are read but unused (no database, no account core yet).
 
@@ -47,13 +49,15 @@ http:
 ps5-profile owns `/api/userProfile/v1/internal/users/me/profiles` and `/users/{id}/profiles` (and v2); keep its
 rule to `.../profiles` so nothing overlaps. The regex above must not be widened to the whole `userProfile` tree.
 
-## Storage and the universal social service
+## Storage
 
-The store is in memory (`internal/social.Memory`), lost on restart, behind the `social.Store` interface. To make
-the graph real, add a `Store` that maps onto the OpenPak universal social service (`prds/universal-social-prd.md`):
-the `account` core is the only friend graph (`friend_requested`, `friend_accepted`, `friend_removed` events),
-`platforms/core/infra/chat` carries notifications, and presence is a core fact with the adapter shaping the
-payload. PS5 account ids would resolve through the `ps5` namespace of `ps5-common/accountcore`. Not built.
+Friends, pending requests and blocks live in Postgres (`PS5_DATABASE_URL`; tables `ps5_friends`, `ps5_friend_requests`,
+`ps5_blocks`, created at start), so one database backup covers them. Presence is transient and stays in memory (the
+console re-announces it). The service exits without a database unless `PS5_DEV_MEMORY=1`.
+
+Why not the core Social service: it keys friendships by core account id and has no decline/cancel of a pending
+request and no block-severs-friendship, which the PSN userProfile API relies on. Moving the graph onto it is a
+later step (`prds/universal-social-prd.md`); the `social.Store` interface is the seam.
 
 ## Release
 

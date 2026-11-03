@@ -15,6 +15,7 @@ import (
 	"github.com/openpak/ps5-common/config"
 	"github.com/openpak/ps5-common/httpx"
 	"github.com/openpak/ps5-common/oauth"
+	"github.com/openpak/ps5-common/pgdb"
 
 	"openpak/ps5-friends/internal/server"
 	"openpak/ps5-friends/internal/social"
@@ -36,10 +37,27 @@ func main() {
 		log.Error("config", "err", err)
 		os.Exit(2)
 	}
-	s := &server.Server{Store: social.NewMemory()}
-	srv := &http.Server{Addr: cfg.Addr, Handler: httpx.Logger(log, s.Handler(signer)), ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	var store social.Store
+	if cfg.DatabaseURL == "" && config.DevMemory(os.Getenv) {
+		log.Warn("PS5_DEV_MEMORY=1: friends are kept in memory and lost on restart (development only)")
+		store = social.NewMemory()
+	} else {
+		pool, err := pgdb.Open(ctx, cfg.DatabaseURL, pgdb.DefaultMaxConns)
+		if err != nil {
+			log.Error("database", "err", err)
+			os.Exit(2)
+		}
+		defer pool.Close()
+		if store, err = social.NewPostgres(ctx, pool, log); err != nil {
+			log.Error("database schema", "err", err)
+			os.Exit(2)
+		}
+		log.Info("friends stored in Postgres")
+	}
+	s := &server.Server{Store: store}
+	srv := &http.Server{Addr: cfg.Addr, Handler: httpx.Logger(log, s.Handler(signer)), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
