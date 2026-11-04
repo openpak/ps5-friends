@@ -73,6 +73,9 @@ type Store interface {
 	SetPresence(id string, p Presence)
 	Touch(id string) // token seen now
 	Presence(id string) (Presence, bool)
+	// Erase removes every friend, request, block and presence row that names any of ids, on
+	// either side, and reports the rows removed. Idempotent.
+	Erase(ids []string) (int, error)
 }
 
 type pair struct{ a, b string }
@@ -232,4 +235,36 @@ func (m *Memory) Presence(id string) (Presence, bool) {
 	defer m.mu.Unlock()
 	p, ok := m.pres[id]
 	return p, ok
+}
+
+// erasePresence drops the transient presence of ids and reports how many entries it held.
+func (m *Memory) erasePresence(ids []string) int {
+	n := 0
+	for _, id := range ids {
+		if _, ok := m.pres[id]; ok {
+			delete(m.pres, id)
+			n++
+		}
+	}
+	return n
+}
+
+// Erase implements Store.
+func (m *Memory) Erase(ids []string) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	set := map[string]bool{}
+	for _, id := range ids {
+		set[id] = true
+	}
+	n := 0
+	for _, g := range []map[pair]bool{m.friends, m.reqs, m.blocks} {
+		for k := range g {
+			if set[k.a] || set[k.b] {
+				delete(g, k)
+				n++
+			}
+		}
+	}
+	return n + m.erasePresence(ids), nil
 }

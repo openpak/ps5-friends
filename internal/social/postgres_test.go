@@ -96,3 +96,24 @@ func TestPostgresGraphSurvivesRestart(t *testing.T) {
 		t.Fatal("sentinels")
 	}
 }
+
+func TestPostgresEraseRemovesBothSidesOnly(t *testing.T) {
+	st := openPG(t)
+	st.Request("1", "2")
+	st.Request("2", "1")
+	st.Request("3", "1")
+	st.Block("6", "1")
+	st.Block("1", "5")
+	st.Request("7", "8")
+	st.Request("8", "7")
+	n, err := st.Erase([]string{"1"})
+	if err != nil || n != 6 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if st.Relation("7", "8") != RelFriend || len(st.Friends("2"))+len(st.Received("1"))+len(st.Blocks("6")) != 0 {
+		t.Fatal("wrong rows removed")
+	}
+	if n, err := st.Erase([]string{"1"}); err != nil || n != 0 {
+		t.Fatalf("second run n=%d err=%v", n, err)
+	}
+}

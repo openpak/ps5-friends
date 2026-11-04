@@ -256,3 +256,33 @@ func (p *Postgres) Unblock(id, other string) error {
 	}
 	return nil
 }
+
+// Erase removes the friend, request and block rows that name any of ids on either side, in one
+// transaction, and the transient presence held in memory.
+func (p *Postgres) Erase(ids []string) (int, error) {
+	ctx, cancel := p.ctx()
+	defer cancel()
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	n := 0
+	for _, q := range []string{
+		`DELETE FROM ps5_friends WHERE account_id = ANY($1) OR friend_id = ANY($1)`,
+		`DELETE FROM ps5_friend_requests WHERE from_id = ANY($1) OR to_id = ANY($1)`,
+		`DELETE FROM ps5_blocks WHERE blocker_id = ANY($1) OR blocked_id = ANY($1)`,
+	} {
+		tag, err := tx.Exec(ctx, q, ids)
+		if err != nil {
+			return 0, err
+		}
+		n += int(tag.RowsAffected())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	p.Memory.mu.Lock()
+	defer p.Memory.mu.Unlock()
+	return n + p.Memory.erasePresence(ids), nil
+}

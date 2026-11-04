@@ -12,7 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/openpak/ps5-common/accountcore"
 	"github.com/openpak/ps5-common/config"
+	"github.com/openpak/ps5-common/erase"
 	"github.com/openpak/ps5-common/httpx"
 	"github.com/openpak/ps5-common/oauth"
 	"github.com/openpak/ps5-common/pgdb"
@@ -57,6 +59,18 @@ func main() {
 		log.Info("friends stored in Postgres")
 	}
 	s := &server.Server{Store: store}
+	var core accountcore.Core
+	if cfg.CoreURL != "" {
+		c, err := accountcore.New(cfg.CoreURL, cfg.CoreToken, nil)
+		if err != nil {
+			log.Error("account core", "err", err)
+			os.Exit(2)
+		}
+		core = c
+	}
+	eraseKey := os.Getenv("ACCOUNT_ERASE_KEY")
+	go erase.Serve(ctx, os.Getenv("ERASE_ADDR"), eraseKey, erase.Handler("ps5-friends", eraseKey, core,
+		func(_ context.Context, ids []string) (int, error) { return store.Erase(ids) }, log), log)
 	srv := &http.Server{Addr: cfg.Addr, Handler: httpx.Logger(log, s.Handler(signer)), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()

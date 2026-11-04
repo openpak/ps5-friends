@@ -62,3 +62,15 @@ later step (`prds/universal-social-prd.md`); the `social.Store` interface is the
 ## Release
 
 Tag `v*.*.*` publishes `ghcr.io/openpak/ps5-friends`; deployed hosts auto-update from it.
+
+## Account erasure
+
+`DELETE /internal/accounts/{account_id}/data` with `Authorization: Bearer <ACCOUNT_ERASE_KEY>` erases everything this service
+holds for a core account (UUID). It listens on `ERASE_ADDR` (default `:9099`, container network only, never published) and is
+only served when `ACCOUNT_ERASE_KEY` is set. The website finaliser calls `http://openpak-ps5-friends:9099`; the reply is
+`{"service":"ps5-friends","rows":N}`. The ids searched are the core account id and, when the core (`PS5_ACCOUNT_CORE_URL`) has an
+active `ps5` link for it, the link subject. If the core is configured but unreachable the call fails (500) rather than
+skipping data.
+
+Erased: friend rows (both directions), requests sent and received, blocks made and blocks against the account, and in-memory presence.
+Kept: nothing per account. Other people lose the friendship/block that referenced the erased account; their own other rows are untouched.

@@ -1,5 +1,12 @@
 # Changelog: ps5-friends
 
+## v0.2.0 (2026-11-04)
+
+- Account erasure (card #120): `DELETE /internal/accounts/{account_id}/data` (bearer `ACCOUNT_ERASE_KEY`, listener `ERASE_ADDR`,
+  default `:9099`) removes the account's friend rows, friend requests, blocks and presence, on both sides (rows where it is
+  the friend, requester, target or blocked party too), in one transaction; one `account erased` log line. Idempotent.
+  Uses ps5-common `erase` and the account core client (`PS5_ACCOUNT_CORE_URL`) to find the `ps5` link subject.
+
 ## v0.1.0 (2026-11-03)
 
 - 2026-11-03: friends, requests and blocks are durable in Postgres (`PS5_DATABASE_URL`; `social.Postgres`, tables `ps5_friends`,
